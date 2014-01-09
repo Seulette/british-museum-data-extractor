@@ -3,7 +3,10 @@ from bs4 import BeautifulSoup
 import json
 import csv 
 
-# these are the base urls we will scrape
+# these are the base urls we will scrape 
+# they are urls for search queries for the specific objects we will get 
+# this can be generated easily by going to "search collections" on the British Museum's website, entering parameters, 
+# and copying the resulting URL 
 url_heal_trade_cards = "http://www.britishmuseum.org/research/collection_online/search.aspx?searchText=trade+cards&images=true&from=ad&fromDate=1650&to=ad&toDate=1830&museumno=Heal"
 url_banks_trade_cards = "http://www.britishmuseum.org/research/collection_online/search.aspx?searchText=trade+cards&images=true&from=ad&fromDate=1650&to=ad&toDate=1830&museumno=Banks"
 search_urls = [url_heal_trade_cards, url_banks_trade_cards]
@@ -26,7 +29,8 @@ for search_url in search_urls:
 	# Each page contains a grid of objects returned by the search query.
 	# We need to get information from each object, and the British Museum site 
 	# only allows us to get this by going to each individual object's page. 
-	# So we get the href url's for every object (which has an image) in the search results.
+	# So we get the href url for every object (which has an image) in the search results. 
+	# We store these, and will later crawl them one by one and extract data. 
 	reference_urls = []
 	for div in cards.find_all('div'): 
 		if 'grid_12' in div.get('class', []): 
@@ -36,6 +40,7 @@ for search_url in search_urls:
 					print ref_url
 					reference_urls.append(ref_url)
 
+	# state the fields to use in the json, and write them in a human-readable form to be written as the header of the csv later
 	### NOTE: field and header MUST stay parallel for csv writing at the end to work 
 	fields = ['institution', 'object_number', 'title_of_object', 'creation_date', 'description', 'text_on_card', 'keywords', 'image_file', 'link_to_image', 'link_to_object_record', 'notes', 'location']
 	header = ['Institution', 'Accession/Object Number', 'Title of Object', 'Creation/Print date','Description', 'Text on Card', 'Keywords', 'Image File Name', 'Link to Image','Link to Object Record','Notes','Location']
@@ -86,6 +91,7 @@ for search_url in search_urls:
 			if u'Inscriptions' in x.contents: 
 				obj_dict['text_on_card'] = x.find_next_sibling('ul').li.ul.li.get_text()
 		# save image to file locally 
+		# we simply use an integer for the filename. this number is printed under 'Image File Name' in the csv.
 		with open('image_files/%s.jpg' % str(image_index), 'w') as imfile: 
 			img = requests.get(obj_dict['link_to_image']).content
 			imfile.write(img)
@@ -98,8 +104,10 @@ for search_url in search_urls:
 with open('bmdbjson.json', 'w') as jsonfile: 
 	json.dump(object_dicts, jsonfile)
 # now, write out the csv 
+# note that we use 'replace' for converting from unicode to ascii, which means that non-unicode characters will 
+# show up as a question mark '?'.
 with open('trade_cards.csv', 'w') as csvfile: 
 	writer = csv.writer(csvfile, dialect='excel', delimiter=',')
 	writer.writerow(header)
 	for od in object_dicts:  
-		writer.writerow([od[field].encode('ascii', 'replace') for field in fields])
+		writer.writerow([od[field].encode('ascii', 'replace') for field in fields]) 
